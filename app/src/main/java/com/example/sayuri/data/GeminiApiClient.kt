@@ -1,5 +1,6 @@
 package com.example.sayuri.data
 
+import android.util.Log
 import com.example.sayuri.BuildConfig
 import com.example.sayuri.model.ApiException
 import com.example.sayuri.model.GeminiRequest
@@ -43,7 +44,7 @@ class GeminiApiClient(
         private val okHttpClient: OkHttpClient = OkHttpClient()
 
         internal const val PRODUCTION_BASE_URL =
-            "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent"
+            "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
 
         private val JSON_MEDIA_TYPE = "application/json; charset=utf-8".toMediaType()
 
@@ -74,7 +75,9 @@ class GeminiApiClient(
 
             response.use { resp ->
                 if (!resp.isSuccessful) {
-                    throw ApiException(resp.code, resp.message)
+                    val errorBody = try { resp.body?.string() } catch (e: Exception) { null }
+                    Log.e("GeminiApiClient", "HTTP ${resp.code}: $errorBody")
+                    throw ApiException(resp.code, errorBody ?: resp.message)
                 }
 
                 val body = resp.body?.string()

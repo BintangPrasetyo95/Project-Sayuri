@@ -150,7 +150,7 @@ class GeminiRepositoryImpl(
         return GeminiRequest(
             contents = contents,
             systemInstruction = systemInstruction,
-            generationConfig = GenerationConfig(maxOutputTokens = 256, temperature = 0.9f)
+            generationConfig = GenerationConfig(maxOutputTokens = 1024, temperature = 0.9f)
         )
     }
 

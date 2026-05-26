@@ -43,7 +43,7 @@
         android:contentDescription="@string/mic_button_description"
         android:src="@drawable/ic_mic"
         app:backgroundTint="@color/colorMicActive"
-        app:fabSize="large"
+        app:fabSize="normal"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent"

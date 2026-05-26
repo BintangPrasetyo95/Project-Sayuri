@@ -203,60 +203,95 @@ class VoiceAssistantViewModel(
                 // Returns here after TTS completes; outer loop resumes WakeWordListening
             }
             .onFailure { error ->
-                val message = when (error) {
-                    is IOException -> "No internet connection"
-                    is ApiException -> "Service error. Try again."
-                    else -> error.message?.takeIf { it.isNotBlank() }
-                        ?: "Something went wrong. Try again."
+                val (message, delayMs) = when {
+                    error is ApiException && error.code == 429 ->
+                        "Rate limited (6/min). Ready in 60s…" to 60_000L
+                    error is IOException ->
+                        "No internet connection" to RECOVERY_DELAY_MS
+                    error is ApiException ->
+                        "Service error ${error.code}. Try again." to RECOVERY_DELAY_MS
+                    else ->
+                        (error.message?.takeIf { it.isNotBlank() }
+                            ?: "Something went wrong. Try again.") to RECOVERY_DELAY_MS
                 }
                 _state.value = AssistantState.Error(message)
-                delay(RECOVERY_DELAY_MS)
+                delay(delayMs)
+                _state.value = AssistantState.Idle
             }
     }
 
-    // ── Mic button toggle ─────────────────────────────────────────────────────────
+    // ── Mic button toggle (TEST MODE: press-to-talk, no wake word) ───────────────
 
     /**
-     * Handles a mic button press as a mute/pause toggle.
+     * TEST MODE: Press-to-talk toggle.
      *
-     * - [AssistantState.WakeWordListening] or [AssistantState.ActiveListening]:
-     *   cancel detector + recognizer, set [AssistantState.Idle], cancel [listeningJob].
-     * - [AssistantState.Speaking]: stop TTS, set [AssistantState.Idle], cancel [listeningJob].
-     * - [AssistantState.Idle]: resume by calling [startWakeWordLoop].
-     * - [AssistantState.Processing]: ignore (no-op).
-     * - [AssistantState.Error]: treat as Idle — resume by calling [startWakeWordLoop].
-     *
-     * Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 2.6
+     * - [AssistantState.Idle] or [AssistantState.Error]: start a single listen session directly.
+     * - [AssistantState.ActiveListening]: cancel listening, return to Idle.
+     * - [AssistantState.Speaking]: stop TTS, return to Idle.
+     * - [AssistantState.Processing]: ignore.
+     * - [AssistantState.WakeWordListening]: cancel, return to Idle (shouldn't happen in test mode).
      */
     fun onMicPressed() {
         when (_state.value) {
-            is AssistantState.WakeWordListening,
+            is AssistantState.Idle,
+            is AssistantState.Error -> {
+                startPushToTalk()
+            }
+
             is AssistantState.ActiveListening -> {
-                wakeWordDetector.cancel()
                 speechRecognizer.cancel()
-                _state.value = AssistantState.Idle
                 listeningJob?.cancel()
                 listeningJob = null
+                _state.value = AssistantState.Idle
             }
 
             is AssistantState.Speaking -> {
                 tts.stop()
-                _state.value = AssistantState.Idle
                 listeningJob?.cancel()
                 listeningJob = null
-            }
-
-            is AssistantState.Idle -> {
-                startWakeWordLoop()
+                _state.value = AssistantState.Idle
             }
 
             is AssistantState.Processing -> {
-                // Ignore press during Processing (Requirement 2.6)
+                // Ignore during processing
             }
 
-            is AssistantState.Error -> {
-                // Treat Error like Idle — resume listening
-                startWakeWordLoop()
+            is AssistantState.WakeWordListening -> {
+                wakeWordDetector.cancel()
+                listeningJob?.cancel()
+                listeningJob = null
+                _state.value = AssistantState.Idle
+            }
+        }
+    }
+
+    /**
+     * TEST MODE: Starts a single press-to-talk session.
+     * Listens once, sends to Gemini, speaks response, then returns to Idle.
+     */
+    private fun startPushToTalk() {
+        listeningJob?.cancel()
+        listeningJob = viewModelScope.launch {
+            try {
+                _state.value = AssistantState.ActiveListening
+                when (val result = speechRecognizer.listen()) {
+                    is SpeechResult.Success -> {
+                        val clean = result.transcript.trim()
+                        if (clean.isBlank()) {
+                            _state.value = AssistantState.Idle
+                            return@launch
+                        }
+                        _state.value = AssistantState.Processing
+                        handleTranscript(clean)
+                        _state.value = AssistantState.Idle
+                    }
+                    is SpeechResult.Error -> {
+                        _state.value = AssistantState.Error(mapSpeechError(result.code))
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Unexpected exception in push-to-talk", e)
+                _state.value = AssistantState.Error("Something went wrong. Try again.")
             }
         }
     }
@@ -309,23 +344,20 @@ class VoiceAssistantViewModel(
      * Requirements: 10.4, 14.5
      */
     fun onResume() {
-        if (ttsReady) {
-            startWakeWordLoop()
-            return
-        }
+        // TEST MODE: don't auto-start the wake word loop — wait for mic button press.
+        // Just initialise TTS so it's ready when the user presses the button.
+        if (ttsReady) return
 
-        // TTS not yet initialised (or previous attempt failed) — try now.
         viewModelScope.launch {
             val success = tts.initialize()
             if (success) {
                 ttsReady = true
-                startWakeWordLoop()
+                // Stay in Idle — user presses mic to start
             } else {
                 Log.w(TAG, "TTS initialisation failed; will retry on next onResume")
                 _state.value = AssistantState.Error(
                     "Voice output unavailable. Will retry shortly."
                 )
-                // ttsReady remains false so the next onResume retries initialisation
             }
         }
     }

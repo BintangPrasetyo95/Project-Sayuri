@@ -129,10 +129,10 @@ Implement the Sayuri voice-first AI assistant Android app in Kotlin using MVVM a
     - Use `kotest-property` `forAll` with arbitrary histories and simulated API failures
     - Assert `conversationManager.getHistory().size` is unchanged from before the failed `sendMessage` call
 
-- [ ] 5. Checkpoint — Core data and API layer
+- [x] 5. Checkpoint — Core data and API layer
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 6. WakeWordDetector implementation
+- [x] 6. WakeWordDetector implementation
   - [x] 6.1 Implement WakeWordDetector with SpeechRecognizer polling loop
     - Build `RecognizerIntent` with `LANGUAGE_MODEL_FREE_FORM` and a short recognition timeout
     - Bridge `RecognitionListener` callbacks to `suspendCancellableCoroutine`
@@ -142,7 +142,7 @@ Implement the Sayuri voice-first AI assistant Android app in Kotlin using MVVM a
     - Register cancellation handler in `suspendCancellableCoroutine` to call `recognizer.cancel()` on coroutine cancellation
     - _Requirements: 1a.1, 1a.2, 1a.5, 1a.6_
 
-  - [-] 6.2 Write unit tests for WakeWordDetector result classification
+  - [x] 6.2 Write unit tests for WakeWordDetector result classification
     - Mock `RecognitionListener` callbacks using MockK
     - Test: result containing "sayuri" → `WakeWordResult.Detected`
     - Test: result containing "SAYURI" (uppercase) → `WakeWordResult.Detected`
@@ -150,8 +150,8 @@ Implement the Sayuri voice-first AI assistant Android app in Kotlin using MVVM a
     - Test: `onError` callback → `WakeWordResult.Error`
     - _Requirements: 1a.2_
 
-- [ ] 7. SpeechRecognizerWrapper implementation
-  - [-] 7.1 Implement SpeechRecognizerWrapper with highest-confidence selection and wake word stripping
+- [x] 7. SpeechRecognizerWrapper implementation
+  - [x] 7.1 Implement SpeechRecognizerWrapper with highest-confidence selection and wake word stripping
     - Build `RecognizerIntent` with `LANGUAGE_MODEL_FREE_FORM`, partial results disabled
     - Bridge `RecognitionListener.onResults` to `suspendCancellableCoroutine`
     - Select the result with the highest confidence score from `SpeechRecognizer.RESULTS_RECOGNITION` + `CONFIDENCE_SCORES`
@@ -174,7 +174,7 @@ Implement the Sayuri voice-first AI assistant Android app in Kotlin using MVVM a
     - Use `kotest-property` `forAll` with arbitrary lists of (transcript, confidence) pairs
     - Assert the returned transcript matches the entry with the maximum confidence score
 
-- [ ] 8. TtsWrapper implementation
+- [x] 8. TtsWrapper implementation
   - [x] 8.1 Implement TtsWrapper with Bluetooth SCO routing and chunked speaking
     - `initialize()`: init `TextToSpeech` with `Locale.US`; bridge `OnInitListener` to a `CompletableDeferred<Boolean>`; return `true` on success, `false` on error
     - `speak(text)`:
@@ -187,14 +187,14 @@ Implement the Sayuri voice-first AI assistant Android app in Kotlin using MVVM a
     - Run on `Dispatchers.Main`
     - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 5.7, 13.4, 13.6_
 
-  - [-] 8.2 Write property test for long text TTS splitting
+  - [x] 8.2 Write property test for long text TTS splitting
     - **Property 17: Long Text TTS Splitting**
     - **Validates: Requirements 5.6**
     - Use `kotest-property` `forAll` with arbitrary strings longer than 500 characters
     - Assert every chunk produced by the splitting function has `length <= 500`
     - Assert the concatenation of all chunks equals the original text (no content lost)
 
-- [ ] 9. BluetoothAudioManager implementation
+- [x] 9. BluetoothAudioManager implementation
   - [x] 9.1 Implement BluetoothAudioManager with SCO lifecycle and StateFlow
     - `initialize()`: register `BroadcastReceiver` for `ACTION_SCO_AUDIO_STATE_UPDATED`
     - `startBluetoothSco()`: call `AudioManager.startBluetoothSco()`; set a 3-second timeout; if `SCO_AUDIO_STATE_CONNECTED` is not received within 3 seconds, emit `isBluetoothScoAvailable = false`
@@ -204,17 +204,17 @@ Implement the Sayuri voice-first AI assistant Android app in Kotlin using MVVM a
     - Check for `BLUETOOTH_CONNECT` permission on API 31+ before SCO operations
     - _Requirements: 6.1, 6.2, 6.3, 6.4, 6.5, 6.6, 6.7_
 
-  - [-] 9.2 Write unit tests for BluetoothAudioManager SCO state transitions
+  - [x] 9.2 Write unit tests for BluetoothAudioManager SCO state transitions
     - Mock `AudioManager` and `BroadcastReceiver` using MockK
     - Test: `SCO_AUDIO_STATE_CONNECTED` broadcast → `isBluetoothScoAvailable == true`
     - Test: 3-second timeout without connection → `isBluetoothScoAvailable == false`
     - Test: `release()` unregisters receiver and stops SCO
     - _Requirements: 6.3, 6.4, 6.6_
 
-- [ ] 10. Checkpoint — Audio pipeline and API layer complete
+- [x] 10. Checkpoint — Audio pipeline and API layer complete
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 11. VoiceAssistantViewModel implementation
+- [x] 11. VoiceAssistantViewModel implementation
   - [x] 11.1 Implement VoiceAssistantViewModel state machine and wake word loop
     - Expose `val state: StateFlow<AssistantState>` (initial value: `Idle`)
     - Implement `startWakeWordLoop()` as a `viewModelScope.launch` coroutine:
@@ -288,10 +288,10 @@ Implement the Sayuri voice-first AI assistant Android app in Kotlin using MVVM a
     - Test: mic press in each state → correct next state
     - _Requirements: 1.1–1.9, 2.1–2.6, 10.1–10.6_
 
-- [ ] 12. Checkpoint — ViewModel complete
+- [x] 12. Checkpoint — ViewModel complete
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 13. MainActivity UI implementation
+- [x] 13. MainActivity UI implementation
   - [x] 13.1 Implement MainActivity layout with dark theme, mic button, and status text
     - Create a single dark-themed screen (background `#121212` or `colorSurface` from Material dark theme)
     - Add a centered mic button (FAB or `ImageButton`) with active/muted visual states
@@ -322,7 +322,7 @@ Implement the Sayuri voice-first AI assistant Android app in Kotlin using MVVM a
     - Instantiate ViewModel via `ViewModelProvider` with a factory that injects all dependencies
     - _Requirements: 14.1, 14.4, 14.5_
 
-- [ ] 14. Final checkpoint — Full integration
+- [x] 14. Final checkpoint — Full integration
   - Ensure all tests pass, ask the user if questions arise.
 
 ---
