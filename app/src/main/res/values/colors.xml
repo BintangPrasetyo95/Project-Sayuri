@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Background -->
+    <color name="colorBackground">#FF121212</color>
+    <color name="colorSurface">#FF1E1E1E</color>
+
+    <!-- Primary accent — used for active mic button and bright pulse -->
+    <color name="colorPrimary">#FF6200EE</color>
+    <color name="colorPrimaryVariant">#FF3700B3</color>
+    <color name="colorOnPrimary">#FFFFFFFF</color>
+
+    <!-- Secondary accent -->
+    <color name="colorSecondary">#FF03DAC6</color>
+    <color name="colorOnSecondary">#FF000000</color>
+
+    <!-- Mic button states -->
+    <!-- Active: bright purple/teal when listening/processing/speaking -->
+    <color name="colorMicActive">#FF6200EE</color>
+    <!-- Muted: dim grey when Idle -->
+    <color name="colorMicMuted">#FF444444</color>
+
+    <!-- Pulse ring colors -->
+    <!-- WakeWordListening: dim, subtle pulse -->
+    <color name="colorPulseDim">#4D6200EE</color>
+    <!-- ActiveListening: bright, prominent pulse -->
+    <color name="colorPulseBright">#9903DAC6</color>
+
+    <!-- Status text -->
+    <color name="colorStatusText">#FFBBBBBB</color>
+    <color name="colorStatusTextActive">#FFFFFFFF</color>
+
+    <!-- Speaking waveform bars -->
+    <color name="colorWaveform">#FF03DAC6</color>
+
+    <!-- Error text -->
+    <color name="colorError">#FFCF6679</color>
+
+    <!-- On-surface text -->
+    <color name="colorOnSurface">#FFFFFFFF</color>
+    <color name="colorOnBackground">#FFFFFFFF</color>
+</resources>

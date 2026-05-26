@@ -1,0 +1,53 @@
+# ── Secrets ──────────────────────────────────────────────────────────────────
+# Never commit API keys or local SDK paths
+local.properties
+
+# ── Gradle ───────────────────────────────────────────────────────────────────
+.gradle/
+build/
+**/build/
+gradle-wrapper.jar
+
+# ── Android Studio / IntelliJ ─────────────────────────────────────────────────
+*.iml
+.idea/
+!.idea/codeStyles/
+!.idea/inspectionProfiles/
+.idea/caches/
+.idea/libraries/
+.idea/modules.xml
+.idea/workspace.xml
+.idea/navEditor.xml
+.idea/assetWizardSettings.xml
+
+# ── OS files ──────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ── Kotlin / Java compiled output ─────────────────────────────────────────────
+*.class
+*.jar
+*.aar
+*.ap_
+
+# ── Native build ──────────────────────────────────────────────────────────────
+.externalNativeBuild/
+.cxx/
+
+# ── Captures / profiling ──────────────────────────────────────────────────────
+captures/
+
+# ── Keystore files ────────────────────────────────────────────────────────────
+# Commit debug keystore only if you need reproducible debug builds across machines
+*.jks
+*.keystore
+!debug.keystore
+
+# ── Test results / coverage ───────────────────────────────────────────────────
+**/test-results/
+**/jacoco/
+
+# ── Kiro metadata ─────────────────────────────────────────────────────────────
+# Task execution metadata — not source code
+.kiro/tasks/

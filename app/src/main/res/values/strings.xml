@@ -1,0 +1,18 @@
+<resources>
+    <string name="app_name">Sayuri</string>
+
+    <!-- Mic button content description for accessibility -->
+    <string name="mic_button_description">Microphone toggle</string>
+
+    <!-- Status text labels — mapped from AssistantState (Requirement 2.8) -->
+    <string name="status_idle">Paused</string>
+    <string name="status_wake_word_listening">Listening for \'Sayuri\'…</string>
+    <string name="status_active_listening">Listening…</string>
+    <string name="status_processing">Thinking…</string>
+    <string name="status_speaking">Speaking…</string>
+
+    <!-- Permission rationale dialog (Requirement 9.3) -->
+    <string name="permission_rationale_title">Microphone Required</string>
+    <string name="permission_rationale_message">Sayuri needs access to your microphone to listen for the wake word and capture your voice commands.</string>
+    <string name="permission_rationale_ok">OK</string>
+</resources>

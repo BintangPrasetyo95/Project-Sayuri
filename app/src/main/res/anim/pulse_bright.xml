@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Bright, prominent pulse animation for ActiveListening state.
+    Faster and more energetic than pulse_dim — clearly distinct to the user.
+    Requirement: 8.4
+-->
+<set xmlns:android="http://schemas.android.com/apk/res/android"
+    android:interpolator="@android:anim/accelerate_decelerate_interpolator">
+
+    <scale
+        android:fromXScale="1.0"
+        android:toXScale="1.45"
+        android:fromYScale="1.0"
+        android:toYScale="1.45"
+        android:pivotX="50%"
+        android:pivotY="50%"
+        android:duration="700"
+        android:repeatCount="infinite"
+        android:repeatMode="reverse" />
+
+    <alpha
+        android:fromAlpha="0.9"
+        android:toAlpha="0.1"
+        android:duration="700"
+        android:repeatCount="infinite"
+        android:repeatMode="reverse" />
+
+</set>

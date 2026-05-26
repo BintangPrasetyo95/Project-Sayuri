@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+        Dark Material theme for Sayuri.
+        Background is #121212 per Material dark theme guidelines.
+        No action bar — the single screen is full-bleed.
+        Requirements: 8.1
+    -->
+    <style name="Theme.Sayuri" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <!-- Primary brand color -->
+        <item name="colorPrimary">@color/colorPrimary</item>
+        <item name="colorPrimaryVariant">@color/colorPrimaryVariant</item>
+        <item name="colorOnPrimary">@color/colorOnPrimary</item>
+
+        <!-- Secondary brand color -->
+        <item name="colorSecondary">@color/colorSecondary</item>
+        <item name="colorOnSecondary">@color/colorOnSecondary</item>
+
+        <!-- Dark surface / background -->
+        <item name="android:colorBackground">@color/colorBackground</item>
+        <item name="colorSurface">@color/colorSurface</item>
+        <item name="colorOnSurface">@color/colorOnSurface</item>
+        <item name="colorOnBackground">@color/colorOnBackground</item>
+
+        <!-- Error color -->
+        <item name="colorError">@color/colorError</item>
+
+        <!-- Status bar and navigation bar — keep dark -->
+        <item name="android:statusBarColor">@color/colorBackground</item>
+        <item name="android:navigationBarColor">@color/colorBackground</item>
+
+        <!-- Window background -->
+        <item name="android:windowBackground">@color/colorBackground</item>
+    </style>
+</resources>

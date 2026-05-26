@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Subtle dim pulse animation for WakeWordListening state.
+    Slowly scales the mic button ring up and fades it out — a passive, low-energy indicator.
+    Requirement: 8.3
+-->
+<set xmlns:android="http://schemas.android.com/apk/res/android"
+    android:interpolator="@android:anim/decelerate_interpolator">
+
+    <scale
+        android:fromXScale="1.0"
+        android:toXScale="1.25"
+        android:fromYScale="1.0"
+        android:toYScale="1.25"
+        android:pivotX="50%"
+        android:pivotY="50%"
+        android:duration="1800"
+        android:repeatCount="infinite"
+        android:repeatMode="restart" />
+
+    <alpha
+        android:fromAlpha="0.5"
+        android:toAlpha="0.0"
+        android:duration="1800"
+        android:repeatCount="infinite"
+        android:repeatMode="restart" />
+
+</set>
