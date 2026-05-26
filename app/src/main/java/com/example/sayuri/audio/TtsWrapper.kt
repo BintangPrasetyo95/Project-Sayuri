@@ -30,10 +30,22 @@ class TtsWrapper(private val context: Context) {
 
     private var tts: TextToSpeech? = null
 
+    /** Currently selected locale for TTS output. Change via [setLocale]. */
+    var locale: TtsLocale = TtsLocale.ENGLISH_US
+
+    // ── Locale enum ───────────────────────────────────────────────────────────────
+
+    enum class TtsLocale(val displayName: String, val javaLocale: Locale) {
+        ENGLISH_US("EN-US", Locale.US),
+        ENGLISH_AU("EN-AU", Locale("en", "AU")),
+        ENGLISH_GB("EN-GB", Locale.UK),
+        INDONESIAN("ID", Locale("id", "ID"))
+    }
+
     // ── Initialization ────────────────────────────────────────────────────────────
 
     /**
-     * Initialises the [TextToSpeech] engine with [Locale.US].
+     * Initialises the [TextToSpeech] engine with the current [locale].
      *
      * Bridges [TextToSpeech.OnInitListener] to a [CompletableDeferred] so the caller
      * can `await` the result in a coroutine.
@@ -56,20 +68,30 @@ class TtsWrapper(private val context: Context) {
         val success = deferred.await()
 
         if (success) {
-            val langResult = engine.setLanguage(Locale.US)
+            val langResult = engine.setLanguage(locale.javaLocale)
             val langOk = langResult != TextToSpeech.LANG_MISSING_DATA &&
                     langResult != TextToSpeech.LANG_NOT_SUPPORTED
             if (langOk) {
                 tts = engine
             } else {
-                engine.shutdown()
-                return@withContext false
+                // Fallback to US English if the selected locale is not available
+                engine.setLanguage(Locale.US)
+                tts = engine
             }
         } else {
             engine.shutdown()
         }
 
         success
+    }
+
+    /**
+     * Changes the TTS locale on the fly without reinitialising the engine.
+     * If the engine is not yet initialised, the locale is stored and applied on next [initialize].
+     */
+    fun setLocale(newLocale: TtsLocale) {
+        locale = newLocale
+        tts?.setLanguage(newLocale.javaLocale)
     }
 
     // ── Speaking ──────────────────────────────────────────────────────────────────

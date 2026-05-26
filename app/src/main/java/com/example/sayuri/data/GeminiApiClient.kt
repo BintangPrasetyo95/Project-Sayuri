@@ -44,7 +44,7 @@ class GeminiApiClient(
         private val okHttpClient: OkHttpClient = OkHttpClient()
 
         internal const val PRODUCTION_BASE_URL =
-            "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+            "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent"
 
         private val JSON_MEDIA_TYPE = "application/json; charset=utf-8".toMediaType()
 

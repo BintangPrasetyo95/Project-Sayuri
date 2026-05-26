@@ -159,4 +159,53 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/indicatorSpace" />
 
+    <!--
+        Subtitle text — shows the full TTS response text while Sayuri is speaking.
+        Scrollable, multi-line, hidden in all other states.
+    -->
+    <ScrollView
+        android:id="@+id/subtitleScroll"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:layout_marginStart="24dp"
+        android:layout_marginEnd="24dp"
+        android:layout_marginTop="16dp"
+        android:layout_marginBottom="72dp"
+        android:visibility="gone"
+        android:fadeScrollbars="true"
+        app:layout_constraintTop_toBottomOf="@id/statusText"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <TextView
+            android:id="@+id/subtitleText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:textColor="#CCFFFFFF"
+            android:textSize="15sp"
+            android:lineSpacingMultiplier="1.4"
+            android:fontFamily="sans-serif-light"
+            tools:text="I'm doing great, tang! Ready to help you with anything. What's on your mind?" />
+
+    </ScrollView>
+
+    <!--
+        Voice selector button — bottom-right corner.
+        Tapping cycles through available TTS locales.
+    -->
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/voiceButton"
+        style="@style/Widget.Material3.Button.TextButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginEnd="16dp"
+        android:layout_marginBottom="24dp"
+        android:textSize="12sp"
+        android:textColor="@color/colorStatusText"
+        android:text="🗣 EN-US"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent" />
+
 </androidx.constraintlayout.widget.ConstraintLayout>

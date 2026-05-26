@@ -220,6 +220,17 @@ class VoiceAssistantViewModel(
             }
     }
 
+    // ── Locale / accent selection ─────────────────────────────────────────────────
+
+    /**
+     * Changes the TTS voice locale. Takes effect immediately on the next spoken utterance.
+     */
+    fun setTtsLocale(locale: TtsWrapper.TtsLocale) {
+        tts.setLocale(locale)
+    }
+
+    fun getTtsLocale(): TtsWrapper.TtsLocale = tts.locale
+
     // ── Mic button toggle (TEST MODE: press-to-talk, no wake word) ───────────────
 
     /**

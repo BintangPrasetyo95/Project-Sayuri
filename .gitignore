@@ -51,3 +51,5 @@ captures/
 # ── Kiro metadata ─────────────────────────────────────────────────────────────
 # Task execution metadata — not source code
 .kiro/tasks/
+
+current_commit.txt

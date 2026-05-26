@@ -19,6 +19,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
+import com.example.sayuri.audio.TtsWrapper
 import com.example.sayuri.model.AssistantState
 import com.example.sayuri.viewmodel.VoiceAssistantViewModel
 import com.example.sayuri.viewmodel.VoiceAssistantViewModelFactory
@@ -70,6 +71,9 @@ class MainActivity : AppCompatActivity() {
     private lateinit var processingSpinner: ProgressBar
     private lateinit var speakingWaveform: LinearLayout
     private lateinit var statusText: TextView
+    private lateinit var subtitleText: TextView
+    private lateinit var subtitleScroll: android.widget.ScrollView
+    private lateinit var voiceButton: com.google.android.material.button.MaterialButton
 
     // Waveform bar views
     private lateinit var waveBar1: View
@@ -96,6 +100,7 @@ class MainActivity : AppCompatActivity() {
 
         observeState()
         bindMicButton()
+        bindVoiceButton()
 
         checkAndRequestPermissions()
     }
@@ -238,6 +243,28 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    // ── Voice selector button ─────────────────────────────────────────────────────
+
+    /**
+     * Cycles through TTS locales on each tap and updates the button label.
+     * Order: EN-US → EN-AU → EN-GB → ID → EN-US → …
+     */
+    internal fun bindVoiceButton() {
+        val locales = TtsWrapper.TtsLocale.entries
+        updateVoiceButtonLabel(viewModel.getTtsLocale())
+
+        voiceButton.setOnClickListener {
+            val current = viewModel.getTtsLocale()
+            val next = locales[(current.ordinal + 1) % locales.size]
+            viewModel.setTtsLocale(next)
+            updateVoiceButtonLabel(next)
+        }
+    }
+
+    private fun updateVoiceButtonLabel(locale: TtsWrapper.TtsLocale) {
+        voiceButton.text = "🗣 ${locale.displayName}"
+    }
+
     // ── Mic button binding ────────────────────────────────────────────────────────
 
     /**
@@ -259,6 +286,9 @@ class MainActivity : AppCompatActivity() {
         processingSpinner = findViewById(R.id.processingSpinner)
         speakingWaveform = findViewById(R.id.speakingWaveform)
         statusText = findViewById(R.id.statusText)
+        subtitleText = findViewById(R.id.subtitleText)
+        subtitleScroll = findViewById(R.id.subtitleScroll)
+        voiceButton = findViewById(R.id.voiceButton)
 
         waveBar1 = findViewById(R.id.waveBar1)
         waveBar2 = findViewById(R.id.waveBar2)
@@ -289,12 +319,15 @@ class MainActivity : AppCompatActivity() {
         stopPulseAnimation()
         stopWaveformAnimation()
 
+        // Hide subtitle by default — only shown in Speaking state
+        subtitleScroll.visibility = View.GONE
+
         when (state) {
             is AssistantState.Idle -> renderIdle()
             is AssistantState.WakeWordListening -> renderWakeWordListening()
             is AssistantState.ActiveListening -> renderActiveListening()
             is AssistantState.Processing -> renderProcessing()
-            is AssistantState.Speaking -> renderSpeaking()
+            is AssistantState.Speaking -> renderSpeaking(state.text)
             is AssistantState.Error -> renderError(state.message)
         }
     }
@@ -359,16 +392,21 @@ class MainActivity : AppCompatActivity() {
 
     /**
      * Speaking state — TTS is reading the response aloud.
-     * Animated waveform bars. Status: "Speaking…".
+     * Animated waveform bars + subtitle showing the response text.
      * Requirement: 8.6
      */
-    private fun renderSpeaking() {
+    private fun renderSpeaking(text: String) {
         setMicActive()
         hidePulseRing()
         hideSpinner()
         showWaveform()
         statusText.text = getString(R.string.status_speaking)
         statusText.setTextColor(ContextCompat.getColor(this, R.color.colorStatusTextActive))
+        // Show subtitle
+        subtitleText.text = text
+        subtitleScroll.visibility = View.VISIBLE
+        // Scroll to top so long responses start from the beginning
+        subtitleScroll.scrollTo(0, 0)
     }
 
     /**
