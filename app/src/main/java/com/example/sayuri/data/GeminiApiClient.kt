@@ -49,7 +49,10 @@ class GeminiApiClient(
         private val JSON_MEDIA_TYPE = "application/json; charset=utf-8".toMediaType()
 
         /** Lenient Json instance that ignores unknown keys from the API response. */
-        private val json = Json { ignoreUnknownKeys = true }
+        private val json = Json {
+            ignoreUnknownKeys = true
+            explicitNulls = false  // don't serialize null fields — Gemini rejects them
+        }
     }
 
     /**
@@ -60,8 +63,10 @@ class GeminiApiClient(
      */
     suspend fun generateContent(request: GeminiRequest): GeminiResponse =
         withContext(Dispatchers.IO) {
-            val requestBody = json.encodeToString(request)
-                .toRequestBody(JSON_MEDIA_TYPE)
+            val requestJson = json.encodeToString(request)
+            Log.d("GeminiApiClient", "Request JSON: $requestJson")
+
+            val requestBody = requestJson.toRequestBody(JSON_MEDIA_TYPE)
 
             // Append the API key as a query parameter — never log the key value.
             val url = "$baseUrl?key=$apiKey"

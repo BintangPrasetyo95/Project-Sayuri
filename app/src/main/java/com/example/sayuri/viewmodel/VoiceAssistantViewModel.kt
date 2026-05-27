@@ -226,7 +226,7 @@ class VoiceAssistantViewModel(
      * Changes the TTS voice locale. Takes effect immediately on the next spoken utterance.
      */
     fun setTtsLocale(locale: TtsWrapper.TtsLocale) {
-        tts.setLocale(locale)
+        tts.locale = locale
     }
 
     fun getTtsLocale(): TtsWrapper.TtsLocale = tts.locale

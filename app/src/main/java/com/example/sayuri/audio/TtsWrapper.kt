@@ -30,8 +30,15 @@ class TtsWrapper(private val context: Context) {
 
     private var tts: TextToSpeech? = null
 
-    /** Currently selected locale for TTS output. Change via [setLocale]. */
+    /**
+     * Currently selected locale for TTS output. Setting this property also updates the
+     * live TTS engine if it has already been initialised.
+     */
     var locale: TtsLocale = TtsLocale.ENGLISH_US
+        set(value) {
+            field = value
+            tts?.setLanguage(value.javaLocale)
+        }
 
     // ── Locale enum ───────────────────────────────────────────────────────────────
 
@@ -83,15 +90,6 @@ class TtsWrapper(private val context: Context) {
         }
 
         success
-    }
-
-    /**
-     * Changes the TTS locale on the fly without reinitialising the engine.
-     * If the engine is not yet initialised, the locale is stored and applied on next [initialize].
-     */
-    fun setLocale(newLocale: TtsLocale) {
-        locale = newLocale
-        tts?.setLanguage(newLocale.javaLocale)
     }
 
     // ── Speaking ──────────────────────────────────────────────────────────────────

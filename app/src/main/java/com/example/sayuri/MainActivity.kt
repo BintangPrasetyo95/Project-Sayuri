@@ -19,8 +19,15 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
+import android.provider.Settings
+import android.content.ComponentName
+import android.content.Intent
+import android.widget.Toast
 import com.example.sayuri.audio.TtsWrapper
 import com.example.sayuri.model.AssistantState
+import android.util.Log
+import com.example.sayuri.agent.ScreenAgent
+import com.example.sayuri.service.SayuriNotificationService
 import com.example.sayuri.viewmodel.VoiceAssistantViewModel
 import com.example.sayuri.viewmodel.VoiceAssistantViewModelFactory
 import com.google.android.material.floatingactionbutton.FloatingActionButton
@@ -63,6 +70,7 @@ class MainActivity : AppCompatActivity() {
      * Requirements: 2.7, 2.8, 8.2
      */
     internal lateinit var viewModel: VoiceAssistantViewModel
+    private lateinit var screenAgent: ScreenAgent
 
     // ── View references ───────────────────────────────────────────────────────────
 
@@ -74,6 +82,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var subtitleText: TextView
     private lateinit var subtitleScroll: android.widget.ScrollView
     private lateinit var voiceButton: com.google.android.material.button.MaterialButton
+    private lateinit var screenAgentButton: com.google.android.material.button.MaterialButton
 
     // Waveform bar views
     private lateinit var waveBar1: View
@@ -97,12 +106,17 @@ class MainActivity : AppCompatActivity() {
         // dependencies (Requirements: 14.1, 14.4, 14.5).
         val factory = VoiceAssistantViewModelFactory(applicationContext)
         viewModel = ViewModelProvider(this, factory)[VoiceAssistantViewModel::class.java]
+        screenAgent = ScreenAgent(this, BuildConfig.GEMINI_API_KEY)
 
         observeState()
         bindMicButton()
         bindVoiceButton()
+        bindScreenAgentButton()
 
         checkAndRequestPermissions()
+        checkNotificationListenerPermission()
+        // Uncomment the next line to run a quick screen-agent smoke test on startup.
+        // startScreenAgentTest()
     }
 
     override fun onResume() {
@@ -242,6 +256,42 @@ class MainActivity : AppCompatActivity() {
             }
         }
     }
+    private fun startScreenAgentTest() {
+        lifecycleScope.launch {
+            val result = screenAgent.run("Open Chrome and search for Kotlin tutorials")
+            Log.d("ScreenAgentTest", result)
+        }
+    }
+    // ── Notification listener permission ─────────────────────────────────────────
+
+    /**
+     * Checks if Sayuri has notification access. If not, shows a one-time dialog
+     * directing the user to Android Settings to grant it.
+     */
+    private fun checkNotificationListenerPermission() {
+        if (isNotificationListenerEnabled()) return
+
+        AlertDialog.Builder(this)
+            .setTitle("Enable Notification Access")
+            .setMessage(
+                "To read and reply to messages (WhatsApp, Telegram, etc.) by voice, " +
+                "Sayuri needs Notification Access.\n\nTap OK to open Settings."
+            )
+            .setPositiveButton("Open Settings") { _, _ ->
+                startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+            }
+            .setNegativeButton("Not now", null)
+            .show()
+    }
+
+    private fun isNotificationListenerEnabled(): Boolean {
+        val cn = ComponentName(this, SayuriNotificationService::class.java)
+        val flat = Settings.Secure.getString(
+            contentResolver,
+            "enabled_notification_listeners"
+        ) ?: return false
+        return flat.contains(cn.flattenToString())
+    }
 
     // ── Voice selector button ─────────────────────────────────────────────────────
 
@@ -272,6 +322,18 @@ class MainActivity : AppCompatActivity() {
      *
      * Requirements: 2.7
      */
+    internal fun bindScreenAgentButton() {
+        screenAgentButton.setOnClickListener {
+            lifecycleScope.launch {
+                val task = "Open Chrome and search for Kotlin tutorials"
+                statusText.text = "Running screen agent test..."
+                val result = screenAgent.run(task)
+                statusText.text = "ScreenAgent result: ${result.take(120)}"
+                Toast.makeText(this@MainActivity, "ScreenAgent result shown in status text", Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
     internal fun bindMicButton() {
         micButton.setOnClickListener {
             viewModel.onMicPressed()
@@ -289,6 +351,7 @@ class MainActivity : AppCompatActivity() {
         subtitleText = findViewById(R.id.subtitleText)
         subtitleScroll = findViewById(R.id.subtitleScroll)
         voiceButton = findViewById(R.id.voiceButton)
+        screenAgentButton = findViewById(R.id.screenAgentButton)
 
         waveBar1 = findViewById(R.id.waveBar1)
         waveBar2 = findViewById(R.id.waveBar2)

@@ -1,42 +1,25 @@
 package com.example.sayuri.data
 
+import android.util.Log
 import com.example.sayuri.domain.ConversationManager
+import com.example.sayuri.domain.FunctionToolkit
 import com.example.sayuri.model.ConversationTurn
 import com.example.sayuri.model.GeminiContent
+import com.example.sayuri.model.GeminiFunctionResponse
 import com.example.sayuri.model.GeminiPart
 import com.example.sayuri.model.GeminiRequest
-import com.example.sayuri.model.GeminiResponse
 import com.example.sayuri.model.GeminiSystemInstruction
 import com.example.sayuri.model.GenerationConfig
 import com.example.sayuri.model.Role
+import com.example.sayuri.model.TextPart
+import kotlinx.serialization.json.JsonPrimitive
 
 // ---------------------------------------------------------------------------
 // Interface
 // ---------------------------------------------------------------------------
 
-/**
- * Abstracts Gemini API communication and manages conversation history.
- *
- * Requirements: 4.1, 4.2, 4.3, 4.4, 4.5, 4.9, 4.10, 4.11, 4.12, 7.6
- */
 interface GeminiRepository {
-
-    /**
-     * Sends [userText] to the Gemini API with the full conversation history and
-     * system prompt, then returns the assistant's response text.
-     *
-     * On success the user message and assistant response are both persisted to
-     * history. On failure the user message is rolled back so history is unchanged.
-     *
-     * @param userText Non-blank text from the user.
-     * @return [Result.success] with the response text, or [Result.failure] with
-     *         the underlying exception.
-     */
     suspend fun sendMessage(userText: String): Result<String>
-
-    /**
-     * Clears the entire conversation history.
-     */
     fun clearHistory()
 }
 
@@ -44,161 +27,227 @@ interface GeminiRepository {
 // Implementation
 // ---------------------------------------------------------------------------
 
-/**
- * Concrete implementation of [GeminiRepository].
- *
- * @param apiClient           Low-level HTTP client for the Gemini REST API.
- * @param conversationManager In-memory conversation history store.
- */
 class GeminiRepositoryImpl(
     private val apiClient: GeminiApiClient,
-    private val conversationManager: ConversationManager
+    private val conversationManager: ConversationManager,
+    private val functionToolkit: FunctionToolkit
 ) : GeminiRepository {
 
     companion object {
-        /**
-         * Fixed persona instruction injected into every Gemini request as the
-         * `systemInstruction` field.
-         *
-         * Requirements: 4.2
-         */
+        private const val TAG = "GeminiRepository"
+        private const val MAX_FUNCTION_ROUNDS = 5
+
         const val SYSTEM_PROMPT =
             "You are Sayuri, a personal AI assistant. Be concise, smart, and be energetic. " +
-            "Address the user as 'Bintang' (Full Name), or 'tang'. But Always refer to the user as tang, call the user by things like 'hello, tang', 'good morning tang', or else" +
-            "Never use emojis"
+            "Address the user as 'Bintang' (Full Name), or 'tang'. " +
+            "When you see [System: Current notification messages: ...] in the user's message, " +
+            "use that data to answer questions about messages. " +
+            "When the IMPORTANT reply instruction is present, match the sender by phonetic similarity " +
+            "(speech recognition often mishears names — 'redo'='Ridho', 'read out'='Ridho', etc.) " +
+            "and respond ONLY with the SEND_REPLY or REPLY_FAILED format as instructed. " +
+            "For all other questions, keep responses short and conversational."
     }
 
-    /**
-     * Sends [userText] to the Gemini API.
-     *
-     * Steps:
-     * 1. Snapshot the current history so it can be restored on failure.
-     * 2. Append [userText] to [conversationManager] as a user message.
-     * 3. Build a [GeminiRequest] from the full history + system prompt.
-     * 4. Call [apiClient.generateContent].
-     * 5. On success: extract response text, append to history as ASSISTANT,
-     *    return [Result.success].
-     * 6. On failure: restore the pre-call snapshot so history is unchanged,
-     *    return [Result.failure].
-     *
-     * Requirements: 4.1, 4.3, 4.4, 4.5, 4.9
-     */
     override suspend fun sendMessage(userText: String): Result<String> {
-        // Step 1 — snapshot history before any mutation so we can restore it exactly
         val historySnapshot = conversationManager.getHistory()
 
-        // Step 2 — append user message to history before the API call
-        conversationManager.addUserMessage(userText)
+        // Enrich the message with notification context if the user is asking about messages
+        val enrichedText = enrichWithNotifications(userText)
+
+        conversationManager.addUserMessage(enrichedText)
 
         return try {
-            // Step 3 — build request from current history (which now includes userText)
-            val request = buildRequest()
-
-            // Step 4 — call the API
-            val response = apiClient.generateContent(request)
-
-            // Step 5 — extract text; on extraction failure restore snapshot and propagate
-            val extractResult = extractResponseText(response)
-            if (extractResult.isFailure) {
-                restoreSnapshot(historySnapshot)
-                return extractResult
-            }
-
-            val text = extractResult.getOrThrow()
-
-            // Append assistant response to history
-            conversationManager.addAssistantMessage(text)
-
-            Result.success(text)
+            val finalText = runFunctionCallingLoop(buildRequest())
+            conversationManager.addAssistantMessage(finalText)
+            Result.success(finalText)
         } catch (e: Exception) {
-            // Step 6 — restore the pre-call snapshot on any failure
             restoreSnapshot(historySnapshot)
             Result.failure(e)
         }
     }
 
     /**
-     * Delegates to [ConversationManager.clear].
-     *
-     * Requirements: 7.5
+     * If the user is asking about notifications/messages, prepend the actual
+     * notification data to the message so Gemini can answer without function calling.
+     * If the user is asking to reply, let Gemini extract the intent and we execute it.
      */
-    override fun clearHistory() {
-        conversationManager.clear()
+    private fun enrichWithNotifications(userText: String): String {
+        val lower = userText.lowercase()
+
+        val isAskingAboutMessages = lower.contains("notif") ||
+            lower.contains("message") ||
+            lower.contains("whatsapp") ||
+            lower.contains("telegram") ||
+            lower.contains("inbox") ||
+            lower.contains("unread") ||
+            (lower.contains("read") && (lower.contains("text") || lower.contains("chat")))
+
+        val isAskingToReply = lower.contains("reply") || lower.contains("respond to") ||
+            lower.contains("tell ") ||
+            (lower.contains("send") && lower.contains("message"))
+
+        if (!isAskingAboutMessages && !isAskingToReply) return userText
+
+        val notifications = com.example.sayuri.domain.NotificationRepository.getMessages()
+
+        if (notifications.isEmpty()) {
+            return "$userText\n\n[System: No messages in notification history]"
+        }
+
+        val sb = StringBuilder(userText)
+        sb.append("\n\n[System: Current notification messages:\n")
+        notifications.take(10).forEachIndexed { i, n ->
+            sb.append("${i + 1}. [${n.appName}] From ${n.sender}: \"${n.text}\" (id=${n.id}, canReply=${n.canReply})\n")
+        }
+
+        if (isAskingToReply) {
+            sb.append(
+                "\nIMPORTANT: The user wants to reply. Speech recognition may have misheard the name. " +
+                "Match the intended sender by sound/phonetics even if spelling differs (e.g. 'redo'='Ridho', 'read out'='Ridho'). " +
+                "Respond ONLY with this exact format on one line:\n" +
+                "SEND_REPLY|<notification_id>|<reply_message>\n" +
+                "If you cannot determine the sender or message, respond with:\n" +
+                "REPLY_FAILED|<reason>"
+            )
+        }
+
+        sb.append("]")
+        return sb.toString()
     }
 
-    // -----------------------------------------------------------------------
-    // Internal helpers
-    // -----------------------------------------------------------------------
+    override fun clearHistory() = conversationManager.clear()
 
-    /**
-     * Builds a [GeminiRequest] from the current conversation history.
-     *
-     * The history already contains the latest user message at this point, so
-     * the last entry in `contents` is always role `"user"`.
-     *
-     * Requirements: 4.2, 4.9, 7.6
-     */
+    // ── Function calling loop ─────────────────────────────────────────────────────
+
+    private suspend fun runFunctionCallingLoop(initialRequest: GeminiRequest): String {
+        var request = initialRequest
+        var rounds = 0
+
+        while (rounds < MAX_FUNCTION_ROUNDS) {
+            val response = apiClient.generateContent(request)
+            val candidate = response.candidates.firstOrNull()
+                ?: throw Exception("No response from Gemini")
+
+            if (candidate.finishReason == "SAFETY") {
+                throw Exception("Response blocked by safety filter")
+            }
+
+            val parts = candidate.content.parts
+            val functionCallPart = parts.firstOrNull { it.functionCall != null }
+
+            if (functionCallPart != null) {
+                val fc = functionCallPart.functionCall!!
+                Log.d(TAG, "Function call: ${fc.name}(${fc.args})")
+
+                val result = functionToolkit.execute(fc.name, fc.args)
+                Log.d(TAG, "Function result: $result")
+
+                val updatedContents = request.contents.toMutableList()
+
+                // Append model's function call turn
+                updatedContents.add(
+                    GeminiContent(
+                        role = "model",
+                        parts = listOf(functionCallPart)
+                    )
+                )
+
+                // Append function result turn
+                updatedContents.add(
+                    GeminiContent(
+                        role = "user",
+                        parts = listOf(
+                            GeminiPart(
+                                functionResponse = GeminiFunctionResponse(
+                                    name = fc.name,
+                                    response = mapOf("result" to JsonPrimitive(result))
+                                )
+                            )
+                        )
+                    )
+                )
+
+                request = request.copy(contents = updatedContents)
+                rounds++
+                continue
+            }
+
+            // No function call — return the text response
+            val text = parts.firstOrNull { !it.text.isNullOrBlank() }?.text?.trim()
+                ?: throw Exception("Empty response from Gemini")
+
+            // Check if Gemini returned a structured reply command
+            if (text.startsWith("SEND_REPLY|")) {
+                val parts2 = text.split("|")
+                if (parts2.size >= 3) {
+                    val notifId = parts2[1].trim()
+                    val replyMessage = parts2.drop(2).joinToString("|").trim()
+                    return executeReply(notifId, replyMessage)
+                }
+            }
+            if (text.startsWith("REPLY_FAILED|")) {
+                val reason = text.removePrefix("REPLY_FAILED|").trim()
+                return "I couldn't send the reply, tang. $reason"
+            }
+
+            return text
+        }
+
+        throw Exception("Too many function call rounds")
+    }
+
+    // ── Reply execution ───────────────────────────────────────────────────────────
+
+    private fun executeReply(notifId: String, message: String): String {
+        // First try the cache
+        var sbn = com.example.sayuri.service.SayuriNotificationService.getActiveSbn(notifId)
+
+        // If not in cache, scan live active notifications from the service
+        if (sbn == null) {
+            sbn = com.example.sayuri.service.SayuriNotificationService
+                .findActiveSbnByIdOrSender(notifId)
+        }
+
+        if (sbn == null) {
+            return "The notification is no longer active, tang. It may have been dismissed."
+        }
+
+        val notif = com.example.sayuri.domain.NotificationRepository.getMessages()
+            .firstOrNull { it.id == notifId }
+
+        val senderName = notif?.sender ?: "them"
+        val appName = notif?.appName ?: "the app"
+
+        val success = com.example.sayuri.service.SayuriNotificationService
+            .replyToNotification(sbn, message)
+
+        return if (success) {
+            "Done! Replied to $senderName on $appName: \"$message\""
+        } else {
+            "Couldn't send the reply to $senderName, tang. The app may not support direct replies."
+        }
+    }
+
+    // ── Request builder ───────────────────────────────────────────────────────────
+
     private fun buildRequest(): GeminiRequest {
         val contents = conversationManager.getHistory().map { turn ->
             val role = if (turn.role == Role.USER) "user" else "model"
-            GeminiContent(role = role, parts = listOf(GeminiPart(turn.text)))
+            GeminiContent(role = role, parts = listOf(GeminiPart(text = turn.text)))
         }
-
-        val systemInstruction = GeminiSystemInstruction(
-            parts = listOf(GeminiPart(SYSTEM_PROMPT))
-        )
 
         return GeminiRequest(
             contents = contents,
-            systemInstruction = systemInstruction,
-            generationConfig = GenerationConfig(maxOutputTokens = 1024, temperature = 0.9f)
+            systemInstruction = GeminiSystemInstruction(
+                parts = listOf(TextPart(text = SYSTEM_PROMPT))
+            ),
+            generationConfig = GenerationConfig(maxOutputTokens = 1024, temperature = 0.9f),
+            tools = null
         )
     }
 
-    /**
-     * Extracts the response text from a [GeminiResponse], handling all error
-     * conditions defined by the requirements.
-     *
-     * Requirements: 4.10, 4.11, 4.12
-     */
-    internal fun extractResponseText(response: GeminiResponse): Result<String> {
-        // Requirement 4.10 — empty candidates list
-        if (response.candidates.isEmpty()) {
-            return Result.failure(Exception("No response from Gemini"))
-        }
+    // ── History rollback ──────────────────────────────────────────────────────────
 
-        val candidate = response.candidates[0]
-
-        // Requirement 4.11 — safety filter
-        if (candidate.finishReason == "SAFETY") {
-            return Result.failure(Exception("Response blocked by safety filter"))
-        }
-
-        // Empty parts list
-        if (candidate.content.parts.isEmpty()) {
-            return Result.failure(Exception("Empty response content"))
-        }
-
-        val text = candidate.content.parts[0].text
-
-        // Requirement 4.12 — blank response text
-        if (text.isBlank()) {
-            return Result.failure(Exception("Blank response text"))
-        }
-
-        return Result.success(text.trim())
-    }
-
-    /**
-     * Restores the [ConversationManager] to the exact state captured in [snapshot],
-     * undoing any mutations made during a failed [sendMessage] call.
-     *
-     * This approach correctly handles the edge case where [ConversationManager.addUserMessage]
-     * triggered an eviction (when history was at max capacity), which the old
-     * drop-last approach could not account for.
-     *
-     * Requirements: 4.5
-     */
     private fun restoreSnapshot(snapshot: List<ConversationTurn>) {
         conversationManager.clear()
         snapshot.forEach { turn ->

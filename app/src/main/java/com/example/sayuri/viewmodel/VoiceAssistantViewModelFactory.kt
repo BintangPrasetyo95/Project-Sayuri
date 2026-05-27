@@ -9,6 +9,7 @@ import com.example.sayuri.audio.TtsWrapper
 import com.example.sayuri.audio.WakeWordDetector
 import com.example.sayuri.data.GeminiApiClient
 import com.example.sayuri.data.GeminiRepositoryImpl
+import com.example.sayuri.domain.FunctionToolkit
 import com.example.sayuri.domain.ConversationManager
 
 /**
@@ -29,13 +30,15 @@ class VoiceAssistantViewModelFactory(private val context: Context) : ViewModelPr
     @Suppress("UNCHECKED_CAST")
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(VoiceAssistantViewModel::class.java)) {
+            val tts = TtsWrapper(context)
             val viewModel = VoiceAssistantViewModel(
                 wakeWordDetector = WakeWordDetector(context),
                 speechRecognizer = SpeechRecognizerWrapper(context),
-                tts = TtsWrapper(context),
+                tts = tts,
                 geminiRepository = GeminiRepositoryImpl(
                     apiClient = GeminiApiClient(),
-                    conversationManager = ConversationManager()
+                    conversationManager = ConversationManager(),
+                    functionToolkit = FunctionToolkit(context)
                 ),
                 bluetoothAudioManager = BluetoothAudioManager(context)
             )

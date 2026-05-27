@@ -1,5 +1,6 @@
 <resources>
     <string name="app_name">Sayuri</string>
+    <string name="accessibility_description">Use Sayuri to control the device screen using gestures and text entry.</string>
 
     <!-- Mic button content description for accessibility -->
     <string name="mic_button_description">Microphone toggle</string>

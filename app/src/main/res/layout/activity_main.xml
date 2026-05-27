@@ -208,4 +208,21 @@
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintBottom_toBottomOf="parent" />
 
+    <!--
+        Screen agent test button — bottom-left corner.
+        Runs a quick ScreenAgent smoke test when pressed.
+    -->
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/screenAgentButton"
+        style="@style/Widget.Material3.Button.TextButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="16dp"
+        android:layout_marginBottom="24dp"
+        android:textSize="12sp"
+        android:textColor="@color/colorStatusText"
+        android:text="Run Screen Agent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent" />
+
 </androidx.constraintlayout.widget.ConstraintLayout>
