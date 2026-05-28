@@ -174,7 +174,7 @@
         android:visibility="gone"
         android:fadeScrollbars="true"
         app:layout_constraintTop_toBottomOf="@id/statusText"
-        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintBottom_toTopOf="@id/messageInputContainer"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent">
 
@@ -191,6 +191,42 @@
 
     </ScrollView>
 
+    <LinearLayout
+        android:id="@+id/messageInputContainer"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="16dp"
+        android:layout_marginEnd="16dp"
+        android:layout_marginBottom="16dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent">
+
+        <EditText
+            android:id="@+id/messageInput"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:backgroundTint="@color/colorStatusText"
+            android:hint="Type a message"
+            android:imeOptions="actionSend"
+            android:inputType="text"
+            android:textColor="@color/colorStatusText"
+            android:textColorHint="@color/colorStatusText"
+            android:padding="12dp"
+            android:background="@android:drawable/edit_text" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/sendButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:text="Send" />
+
+    </LinearLayout>
+
     <!--
         Voice selector button — bottom-right corner.
         Tapping cycles through available TTS locales.
@@ -201,12 +237,12 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginEnd="16dp"
-        android:layout_marginBottom="24dp"
+        android:layout_marginBottom="16dp"
         android:textSize="12sp"
         android:textColor="@color/colorStatusText"
         android:text="🗣 EN-US"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintBottom_toBottomOf="parent" />
+        app:layout_constraintBottom_toTopOf="@id/messageInputContainer" />
 
     <!--
         Screen agent test button — bottom-left corner.
@@ -218,11 +254,11 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginStart="16dp"
-        android:layout_marginBottom="24dp"
+        android:layout_marginBottom="16dp"
         android:textSize="12sp"
         android:textColor="@color/colorStatusText"
         android:text="Run Screen Agent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintBottom_toBottomOf="parent" />
+        app:layout_constraintBottom_toTopOf="@id/messageInputContainer" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>
