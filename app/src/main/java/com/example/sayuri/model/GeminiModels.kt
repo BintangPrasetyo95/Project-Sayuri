@@ -79,7 +79,7 @@ data class FunctionDeclaration(
  */
 @Serializable
 data class FunctionParameters(
-    val type: String = "object",
+    val type: String,
     val properties: Map<String, FunctionProperty> = emptyMap(),
     val required: List<String>? = null  // null = omitted, empty list causes 400
 )

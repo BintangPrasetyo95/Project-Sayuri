@@ -1,12 +1,19 @@
 package com.example.sayuri.ui
 
 import android.animation.ObjectAnimator
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
+import android.hardware.display.DisplayManager
+import android.os.Build
+import androidx.annotation.RequiresApi
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -18,11 +25,14 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.sayuri.BuildConfig
+import com.example.sayuri.agent.ScreenAgent
 import com.example.sayuri.model.AssistantState
 import com.example.sayuri.viewmodel.VoiceAssistantViewModel
 import kotlinx.coroutines.launch
@@ -31,7 +41,26 @@ import kotlinx.coroutines.launch
 fun SayuriScreen(viewModel: VoiceAssistantViewModel) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     var messageText by remember { mutableStateOf("") }
+    var sayuriResponse by remember { mutableStateOf<String?>(null) }
+    var screenAgentResult by remember { mutableStateOf<String?>(null) }
+    var isRunningAgent by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+    val visualContext = remember(context) {
+        context.findVisualContext()
+    }
+    val screenAgent = remember(visualContext) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            ScreenAgent(visualContext, BuildConfig.GEMINI_API_KEY)
+        } else null
+    }
+
+    // Update sayuri response when Speaking state occurs
+    LaunchedEffect(state) {
+        if (state is AssistantState.Speaking) {
+            sayuriResponse = (state as AssistantState.Speaking).text
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -50,30 +79,126 @@ fun SayuriScreen(viewModel: VoiceAssistantViewModel) {
 
         StatusTextView(state = state)
 
-        // ── Subtitle (speaking state) ──────────────────────────────────────────
+        // ── Sayuri response (persists until new input) ─────────────────────────
         AnimatedVisibility(
-            visible = state is AssistantState.Speaking,
+            visible = sayuriResponse != null && screenAgentResult == null,
             enter = fadeIn(),
             exit = fadeOut(),
             modifier = Modifier
-                .weight(1f)
+                .weight(0.8f)
                 .fillMaxWidth()
                 .padding(horizontal = 24.dp, vertical = 16.dp)
         ) {
-            if (state is AssistantState.Speaking) {
+            if (sayuriResponse != null) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .verticalScroll(rememberScrollState())
+                        .background(Color(0xFF2A2A2A), shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp))
+                        .padding(16.dp)
                 ) {
-                    Text(
-                        text = (state as AssistantState.Speaking).text,
-                        color = Color(0xCCFFFFFF),
-                        fontSize = 15.sp,
-                        lineHeight = 21.sp,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.fillMaxWidth()
-                    )
+                    Column {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Sayuri:",
+                                color = Color(0xFF00BCD4),
+                                fontSize = 14.sp,
+                                fontStyle = androidx.compose.ui.text.font.FontStyle.Italic
+                            )
+                            Button(
+                                onClick = {
+                                    val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                                    val clip = android.content.ClipData.newPlainText("Sayuri Response", sayuriResponse)
+                                    clipboard.setPrimaryClip(clip)
+                                },
+                                modifier = Modifier
+                                    .height(28.dp)
+                                    .width(70.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF424242)),
+                                contentPadding = androidx.compose.foundation.layout.PaddingValues(4.dp)
+                            ) {
+                                Text("Copy", fontSize = 10.sp)
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = sayuriResponse ?: "",
+                            color = Color(0xFFCCCCCC),
+                            fontSize = 14.sp,
+                            lineHeight = 20.sp,
+                            textAlign = TextAlign.Start,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .selectableGroup()
+                        )
+                    }
+                }
+            }
+        }
+
+        // ── Screen agent result ────────────────────────────────────────────────
+        AnimatedVisibility(
+            visible = screenAgentResult != null,
+            enter = fadeIn(),
+            exit = fadeOut(),
+            modifier = Modifier
+                .weight(0.8f)
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp, vertical = 16.dp)
+        ) {
+            if (screenAgentResult != null) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState())
+                        .background(Color(0xFF2A2A2A), shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp))
+                        .padding(16.dp)
+                ) {
+                    Column {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Screen Agent:",
+                                color = Color(0xFF00BCD4),
+                                fontSize = 14.sp,
+                                fontStyle = androidx.compose.ui.text.font.FontStyle.Italic
+                            )
+                            Button(
+                                onClick = {
+                                    val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                                    val clip = android.content.ClipData.newPlainText("Screen Agent Result", screenAgentResult)
+                                    clipboard.setPrimaryClip(clip)
+                                },
+                                modifier = Modifier
+                                    .height(28.dp)
+                                    .width(70.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF424242)),
+                                contentPadding = androidx.compose.foundation.layout.PaddingValues(4.dp)
+                            ) {
+                                Text("Copy", fontSize = 10.sp)
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = screenAgentResult ?: "",
+                            color = Color(0xFFCCCCCC),
+                            fontSize = 13.sp,
+                            lineHeight = 18.sp,
+                            textAlign = TextAlign.Start,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .selectableGroup()
+                        )
+                    }
                 }
             }
         }
@@ -88,11 +213,32 @@ fun SayuriScreen(viewModel: VoiceAssistantViewModel) {
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Button(
-                onClick = { /* TODO: Implement screen agent */ },
-                colors = ButtonDefaults.textButtonColors(),
+                onClick = {
+                    if (messageText.trim().isNotEmpty() && screenAgent != null && !isRunningAgent) {
+                        isRunningAgent = true
+                        sayuriResponse = null
+                        scope.launch {
+                            try {
+                                val result = screenAgent.run(messageText.trim())
+                                screenAgentResult = result
+                                messageText = ""
+                            } catch (e: Exception) {
+                                screenAgentResult = "Error: ${e.message}"
+                            } finally {
+                                isRunningAgent = false
+                            }
+                        }
+                    }
+                },
+                enabled = !isRunningAgent && messageText.trim().isNotEmpty() && screenAgent != null,
+                colors = ButtonDefaults.buttonColors(),
                 modifier = Modifier.height(40.dp)
             ) {
-                Text("Run Screen Agent", fontSize = 12.sp, color = Color(0xFFB3B3B3))
+                Text(
+                    if (isRunningAgent) "Running…" else "Run Screen Agent",
+                    fontSize = 12.sp,
+                    color = Color(0xFFB3B3B3)
+                )
             }
 
             Button(
@@ -118,12 +264,14 @@ fun SayuriScreen(viewModel: VoiceAssistantViewModel) {
                 modifier = Modifier
                     .weight(1f)
                     .height(56.dp),
-                placeholder = { Text("Type a message", fontSize = 14.sp) },
+                placeholder = { Text("Type a message or task", fontSize = 14.sp) },
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
                 keyboardActions = KeyboardActions(
                     onSend = {
                         if (messageText.trim().isNotEmpty()) {
+                            sayuriResponse = null
+                            screenAgentResult = null
                             scope.launch {
                                 viewModel.handleTranscript(messageText.trim())
                                 messageText = ""
@@ -144,6 +292,8 @@ fun SayuriScreen(viewModel: VoiceAssistantViewModel) {
             Button(
                 onClick = {
                     if (messageText.trim().isNotEmpty()) {
+                        sayuriResponse = null
+                        screenAgentResult = null
                         scope.launch {
                             viewModel.handleTranscript(messageText.trim())
                             messageText = ""
@@ -238,4 +388,19 @@ private fun StatusTextView(state: AssistantState) {
             .fillMaxWidth()
             .padding(horizontal = 32.dp)
     )
+}
+
+private fun Context.findVisualContext(): Context {
+    if (this is Activity) return this
+    if (this is ContextWrapper) {
+        val base = baseContext
+        if (base is Activity) return base
+        return base.findVisualContext()
+    }
+
+    return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1) {
+        val displayManager = getSystemService(DisplayManager::class.java)
+        val display = displayManager?.displays?.firstOrNull()
+        if (display != null) createDisplayContext(display) else this
+    } else this
 }

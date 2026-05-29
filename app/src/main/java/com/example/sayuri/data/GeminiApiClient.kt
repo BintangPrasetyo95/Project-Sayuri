@@ -52,6 +52,7 @@ class GeminiApiClient(
         private val json = Json {
             ignoreUnknownKeys = true
             explicitNulls = false  // don't serialize null fields — Gemini rejects them
+            encodeDefaults = true  // always emit default schema fields like type = "object"
         }
     }
 

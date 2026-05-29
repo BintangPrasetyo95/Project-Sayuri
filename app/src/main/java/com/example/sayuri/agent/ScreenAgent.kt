@@ -6,8 +6,11 @@
 
 package com.example.sayuri.agent
 
+import android.app.Activity
 import android.content.Context
+import android.content.ContextWrapper
 import android.content.Intent
+import android.hardware.display.DisplayManager
 import android.os.Build
 import android.provider.Settings
 import androidx.annotation.RequiresApi
@@ -26,6 +29,7 @@ class ScreenAgent(
     apiKey: String = BuildConfig.GEMINI_API_KEY,
     private val maxSteps: Int = 20
 ) {
+    private val visualContext = context.findVisualContext()
     private val apiClient = GeminiApiClient(apiKey)
 
     private val tools = listOf(
@@ -232,10 +236,10 @@ class ScreenAgent(
                 }
                 "open_app" -> {
                     val pkg = args["package_name"]?.jsonPrimitive?.content ?: ""
-                    val intent = context.packageManager.getLaunchIntentForPackage(pkg)
+                    val intent = visualContext.packageManager.getLaunchIntentForPackage(pkg)
                         ?: return "App not found: $pkg"
                     intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                    context.startActivity(intent)
+                    visualContext.startActivity(intent)
                     Thread.sleep(1500)
                     "Launched $pkg"
                 }
@@ -250,8 +254,23 @@ class ScreenAgent(
         val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS).apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
-        context.startActivity(intent)
+        visualContext.startActivity(intent)
         return "Accessibility Service is not running. " +
             "Opening Settings → please enable Sayuri under Accessibility, then try again."
+    }
+
+    private fun Context.findVisualContext(): Context {
+        if (this is Activity) return this
+        if (this is ContextWrapper) {
+            val base = baseContext
+            if (base is Activity) return base
+            return base.findVisualContext()
+        }
+
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1) {
+            val displayManager = getSystemService(DisplayManager::class.java)
+            val display = displayManager?.displays?.firstOrNull()
+            if (display != null) createDisplayContext(display) else this
+        } else this
     }
 }

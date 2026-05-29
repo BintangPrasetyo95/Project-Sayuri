@@ -41,7 +41,8 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        val factory = VoiceAssistantViewModelFactory(applicationContext)
+        // Use the Activity as a visual Context for components like TextToSpeech
+        val factory = VoiceAssistantViewModelFactory(this)
         viewModel = ViewModelProvider(this, factory)[VoiceAssistantViewModel::class.java]
 
         setContent {
