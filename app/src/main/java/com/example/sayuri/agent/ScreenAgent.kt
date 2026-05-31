@@ -13,6 +13,11 @@ import android.content.Intent
 import android.hardware.display.DisplayManager
 import android.os.Build
 import android.provider.Settings
+import android.util.Log
+import java.io.File
+import java.io.IOException
+import java.io.PrintWriter
+import java.io.StringWriter
 import androidx.annotation.RequiresApi
 import com.example.sayuri.BuildConfig
 import com.example.sayuri.data.GeminiApiClient
@@ -25,11 +30,11 @@ import kotlinx.serialization.json.jsonPrimitive
 
 @RequiresApi(Build.VERSION_CODES.R)
 class ScreenAgent(
-    private val context: Context,
+    private val activity: Activity,
     apiKey: String = BuildConfig.GEMINI_API_KEY,
     private val maxSteps: Int = 20
 ) {
-    private val visualContext = context.findVisualContext()
+    private val visualContext: Context = activity
     private val apiClient = GeminiApiClient(apiKey)
 
     private val tools = listOf(
@@ -138,7 +143,19 @@ class ScreenAgent(
                 )
             )
 
-            var response = sendRequest(history)
+            val screenshotTest = svc.captureScreen()
+            if (screenshotTest == null) {
+                val message = "Failed to capture screen. Check accessibility permission and that the service is running."
+                logScreenAgentError("ScreenAgent", IOException(message))
+                return@withContext message
+            }
+
+            var response = try {
+                sendRequest(history)
+            } catch (e: Exception) {
+                logScreenAgentError("ScreenAgent", e)
+                return@withContext "Screen agent failed: ${e.message}"
+            }
             var stepCount = 0
 
             while (stepCount < maxSteps) {
@@ -146,7 +163,9 @@ class ScreenAgent(
                 val functionCall = part?.functionCall
 
                 if (functionCall == null) {
-                    return@withContext part?.text ?: "No action returned from Gemini."
+                    val message = part?.text ?: "No action returned from Gemini."
+                    logScreenAgentError("ScreenAgent", IOException(message))
+                    return@withContext message
                 }
 
                 if (functionCall.name == "done") {
@@ -185,7 +204,12 @@ class ScreenAgent(
                     )
                 )
 
-                response = sendRequest(history)
+                response = try {
+                    sendRequest(history)
+                } catch (e: Exception) {
+                    logScreenAgentError("ScreenAgent", e)
+                    return@withContext "Screen agent failed mid-run: ${e.message}"
+                }
             }
 
             "Reached max steps ($maxSteps) without completing."
@@ -236,16 +260,17 @@ class ScreenAgent(
                 }
                 "open_app" -> {
                     val pkg = args["package_name"]?.jsonPrimitive?.content ?: ""
-                    val intent = visualContext.packageManager.getLaunchIntentForPackage(pkg)
+                    val intent = activity.packageManager.getLaunchIntentForPackage(pkg)
                         ?: return "App not found: $pkg"
                     intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                    visualContext.startActivity(intent)
+                    activity.startActivity(intent)
                     Thread.sleep(1500)
                     "Launched $pkg"
                 }
                 else -> "Unknown action: $name"
             }
         } catch (e: Exception) {
+            logScreenAgentError("ScreenAgent", e)
             "Error in $name: ${e.message}"
         }
     }
@@ -254,9 +279,24 @@ class ScreenAgent(
         val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS).apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
-        visualContext.startActivity(intent)
+        activity.startActivity(intent)
         return "Accessibility Service is not running. " +
             "Opening Settings → please enable Sayuri under Accessibility, then try again."
+    }
+
+    private fun logScreenAgentError(tag: String, throwable: Throwable) {
+        Log.e(tag, "ScreenAgent error", throwable)
+        try {
+            val ext = activity.getExternalFilesDir("debug")
+            val logFile = if (ext != null) File(ext, "screen_agent_errors.txt") else File(activity.filesDir, "screen_agent_errors.txt")
+            logFile.appendText("=== ${System.currentTimeMillis()} ${tag} ===\n")
+            val sw = StringWriter()
+            throwable.printStackTrace(PrintWriter(sw))
+            logFile.appendText(sw.toString())
+            logFile.appendText("\n\n")
+        } catch (ignored: Exception) {
+            Log.e(tag, "Failed to write screen agent error log: ${ignored.message}")
+        }
     }
 
     private fun Context.findVisualContext(): Context {
@@ -267,10 +307,17 @@ class ScreenAgent(
             return base.findVisualContext()
         }
 
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1) {
-            val displayManager = getSystemService(DisplayManager::class.java)
-            val display = displayManager?.displays?.firstOrNull()
-            if (display != null) createDisplayContext(display) else this
-        } else this
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1) {
+            return try {
+                val displayManager = getSystemService(DisplayManager::class.java)
+                val display = displayManager?.displays?.firstOrNull()
+                if (display != null) createDisplayContext(display) else this
+            } catch (e: Exception) {
+                Log.w("ScreenAgent", "createDisplayContext failed; falling back to original context (${this::class.java.simpleName}): ${e.message}")
+                this
+            }
+        }
+
+        return this
     }
 }

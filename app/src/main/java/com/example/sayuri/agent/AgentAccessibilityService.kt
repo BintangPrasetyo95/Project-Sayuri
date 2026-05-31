@@ -22,6 +22,7 @@ import android.os.Build
 import android.os.Bundle
 import android.view.accessibility.AccessibilityEvent
 import androidx.annotation.RequiresApi
+import android.util.Log
 import java.io.ByteArrayOutputStream
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
@@ -46,27 +47,42 @@ class AgentAccessibilityService : AccessibilityService() {
     fun captureScreen(): ByteArray? {
         var result: ByteArray? = null
         val latch = CountDownLatch(1)
+        val displayId = try {
+            display?.displayId ?: 0
+        } catch (e: Exception) {
+            Log.w("AgentAccessibilityService", "accessing display failed: ${e.message}")
+            0
+        }
 
-        val displayId = display?.displayId ?: 0
-        takeScreenshot(
-            displayId,
-            mainExecutor,
-            object : TakeScreenshotCallback {
-                override fun onSuccess(screenshot: ScreenshotResult) {
-                    val bmp = Bitmap.wrapHardwareBuffer(
-                        screenshot.hardwareBuffer, screenshot.colorSpace
-                    )
-                    val baos = ByteArrayOutputStream()
-                    bmp?.compress(Bitmap.CompressFormat.JPEG, 80, baos)
-                    result = baos.toByteArray()
-                    latch.countDown()
-                }
+        try {
+            takeScreenshot(
+                displayId,
+                mainExecutor,
+                object : TakeScreenshotCallback {
+                    override fun onSuccess(screenshot: ScreenshotResult) {
+                        try {
+                            val bmp = Bitmap.wrapHardwareBuffer(
+                                screenshot.hardwareBuffer, screenshot.colorSpace
+                            )
+                            val baos = ByteArrayOutputStream()
+                            bmp?.compress(Bitmap.CompressFormat.JPEG, 80, baos)
+                            result = baos.toByteArray()
+                        } catch (e: Exception) {
+                            Log.w("AgentAccessibilityService", "Failed to process screenshot: ${e.message}")
+                        } finally {
+                            latch.countDown()
+                        }
+                    }
 
-                override fun onFailure(errorCode: Int) {
-                    latch.countDown()
+                    override fun onFailure(errorCode: Int) {
+                        latch.countDown()
+                    }
                 }
-            }
-        )
+            )
+        } catch (e: Exception) {
+            Log.w("AgentAccessibilityService", "takeScreenshot failed (displayId=$displayId): ${e.message}")
+            latch.countDown()
+        }
 
         latch.await(3, TimeUnit.SECONDS)
         return result

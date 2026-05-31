@@ -41,7 +41,12 @@ class GeminiApiClient(
 
     companion object {
         /** Single shared [OkHttpClient] instance — reused for connection pooling. */
-        private val okHttpClient: OkHttpClient = OkHttpClient()
+        private val okHttpClient: OkHttpClient = OkHttpClient.Builder()
+            .connectTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
+            .readTimeout(60, java.util.concurrent.TimeUnit.SECONDS)
+            .writeTimeout(60, java.util.concurrent.TimeUnit.SECONDS)
+            .callTimeout(60, java.util.concurrent.TimeUnit.SECONDS)
+            .build()
 
         internal const val PRODUCTION_BASE_URL =
             "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent"
@@ -111,6 +116,7 @@ private suspend fun Call.await(): Response = suspendCancellableCoroutine { conti
         }
 
         override fun onFailure(call: Call, e: IOException) {
+            Log.e("GeminiApiClient", "HTTP call failed", e)
             continuation.resumeWithException(e)
         }
     })

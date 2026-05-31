@@ -4,8 +4,11 @@ import android.animation.ObjectAnimator
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
+import android.util.Log
+import android.content.Intent
 import android.hardware.display.DisplayManager
 import android.os.Build
+import android.provider.Settings
 import androidx.annotation.RequiresApi
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
@@ -46,12 +49,12 @@ fun SayuriScreen(viewModel: VoiceAssistantViewModel) {
     var isRunningAgent by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
-    val visualContext = remember(context) {
-        context.findVisualContext()
+    val activity = remember(context) {
+        context.findVisualContext() as? Activity
     }
-    val screenAgent = remember(visualContext) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            ScreenAgent(visualContext, BuildConfig.GEMINI_API_KEY)
+    val screenAgent = remember(activity) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && activity != null) {
+            ScreenAgent(activity, BuildConfig.GEMINI_API_KEY)
         } else null
     }
 
@@ -78,6 +81,28 @@ fun SayuriScreen(viewModel: VoiceAssistantViewModel) {
         Spacer(modifier = Modifier.height(32.dp))
 
         StatusTextView(state = state)
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Button(
+            onClick = {
+                context.startActivity(
+                    Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
+                )
+            },
+            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF424242)),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp)
+        ) {
+            Text(
+                text = "Open Accessibility Settings",
+                color = Color(0xFFFFFFFF),
+                fontSize = 14.sp
+            )
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
 
         // ── Sayuri response (persists until new input) ─────────────────────────
         AnimatedVisibility(
@@ -398,9 +423,16 @@ private fun Context.findVisualContext(): Context {
         return base.findVisualContext()
     }
 
-    return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1) {
-        val displayManager = getSystemService(DisplayManager::class.java)
-        val display = displayManager?.displays?.firstOrNull()
-        if (display != null) createDisplayContext(display) else this
-    } else this
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1) {
+        return try {
+            val displayManager = getSystemService(DisplayManager::class.java)
+            val display = displayManager?.displays?.firstOrNull()
+            if (display != null) createDisplayContext(display) else this
+        } catch (e: Exception) {
+            Log.w("SayuriScreen", "createDisplayContext failed; falling back to original context (${this::class.java.simpleName}): ${e.message}")
+            this
+        }
+    }
+
+    return this
 }
